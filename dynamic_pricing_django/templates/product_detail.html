@@ -1,0 +1,313 @@
+{% load static %} {# Keep load static for other static files if any, but not for charts #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ product.name }} - Product Detail</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chart-image {
+            width: 100%;
+            height: auto;
+            max-width: 100%;
+            display: block;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .animate-fade-in-down {
+            animation: fadeInDown 0.5s ease-out forwards;
+        }
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) translateX(-50%);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) translateX(-50%);
+            }
+        }
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            -webkit-animation: spin 1s ease-in-out infinite;
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { -webkit-transform: rotate(360deg); }
+        }
+        @-webkit-keyframes spin {
+            to { -webkit-transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-100 font-sans text-gray-800 p-4 sm:p-6 lg:p-8">
+    <!-- Global Alert Message Container -->
+    <div id="alert-container"></div>
+
+    <!-- Header -->
+    <header class="bg-white rounded-xl shadow-md p-4 mb-8">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-2">
+            <h1 class="text-3xl sm:text-4xl font-bold text-indigo-700 mb-2 sm:mb-0">
+                {{ product.name }} Details
+            </h1>
+            <div class="flex items-center space-x-4">
+                <a href="{% url 'dashboard' %}"
+                   class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                    Back to Dashboard
+                </a>
+                {% if user.is_authenticated %}
+                    <span class="text-gray-700 text-lg font-medium">Hello, {{ user.username }}!</span>
+                    <a href="{% url 'logout' %}"
+                       class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                        Logout
+                    </a>
+                {% else %}
+                    <a href="{% url 'login' %}"
+                       class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                        Login
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        <p class="text-gray-600 mt-2 text-center">
+            In-depth analysis and historical trends for {{ product.name }}
+        </p>
+    </header>
+
+    <main class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Product Overview -->
+        <section class="bg-white rounded-xl shadow-md p-6">
+            <h2 class="text-2xl font-semibold text-indigo-600 mb-4">Product Overview</h2>
+            <div class="space-y-3 text-gray-700">
+                {% load custom_filters %}
+                <p><strong>Category:</strong> {{ product.category }}</p>
+                <p><strong>Current Price:</strong> ${{ product.current_price|floatformat:2 }}</p>
+                <p><strong>Suggested Price:</strong> ${{ product.suggested_price|floatformat:2 }}</p>
+                <p><strong>Inventory:</strong> {{ product.inventory }}</p>
+                <p><strong>Demand Forecast (7 Days):</strong> {{ product.demand_forecast }}</p>
+                <p><strong>Sales (Last 7 Days):</strong> {{ product.sales_last_7_days }}</p>
+                <p><strong>Margin:</strong> {{ product.margin|multiply:100|floatformat:1 }}%</p>
+                <p><strong>Competitor Price:</strong> ${{ product.competitor_price|floatformat:2 }}</p>
+                <p><strong>Last Updated:</strong> {{ product.last_updated|date:"DATETIME_FORMAT" }}</p>
+            </div>
+
+            <h3 class="text-xl font-semibold text-indigo-600 mt-6 mb-4">Add/Update Historical Sales</h3>
+            <div class="space-y-3">
+                <div>
+                    <label for="recordDate" class="block text-sm font-medium text-gray-700">Date:</label>
+                    <input type="date" id="recordDate"
+                           class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="salesUnits" class="block text-sm font-medium text-gray-700">Sales Units:</label>
+                    <input type="number" id="salesUnits" min="0"
+                           class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <button id="addHistoryBtn"
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                    <span id="addHistoryBtnText">Add/Update Record</span>
+                    <span id="addHistorySpinner" class="spinner hidden"></span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Historical Charts (now using images generated by Matplotlib) -->
+        <section class="bg-white rounded-xl shadow-md p-6">
+            <h2 class="text-2xl font-semibold text-indigo-600 mb-4">Historical Performance</h2>
+            <div class="space-y-6">
+                <div class="h-80 flex items-center justify-center bg-gray-50 rounded-lg">
+                    <h3 class="text-xl font-medium text-gray-700 mb-2 absolute top-4 left-4">Sales History</h3>
+                    <img id="salesHistoryChartImg" src="" alt="Sales History Chart" class="chart-image">
+                    <p id="salesHistoryChartPlaceholder" class="text-gray-500 hidden">Not enough data to generate Sales History Chart.</p>
+                </div>
+                <div class="h-80 flex items-center justify-center bg-gray-50 rounded-lg">
+                    <h3 class="text-xl font-medium text-gray-700 mb-2 absolute top-4 left-4">Price History</h3>
+                    <img id="priceHistoryChartImg" src="" alt="Price History Chart" class="chart-image">
+                    <p id="priceHistoryChartPlaceholder" class="text-gray-500 hidden">Not enough data to generate Price History Chart.</p>
+                </div>
+                <div class="h-80 flex items-center justify-center bg-gray-50 rounded-lg">
+                    <h3 class="text-xl font-medium text-gray-700 mb-2 absolute top-4 left-4">Inventory History</h3>
+                    <img id="inventoryHistoryChartImg" src="" alt="Inventory History Chart" class="chart-image">
+                    <p id="inventoryHistoryChartPlaceholder" class="text-gray-500 hidden">Not enough data to generate Inventory History Chart.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    {# Removed Chart.js CDN and all Chart.js related JavaScript #}
+    <script>
+        // Data passed from Django view (only product ID and name needed for API calls)
+        const product = {
+            id: '{{ product.id }}',
+            name: '{{ product.name }}',
+        };
+
+        // Get references to history input elements
+        const recordDateInput = document.getElementById('recordDate');
+        const salesUnitsInput = document.getElementById('salesUnits');
+        const addHistoryBtn = document.getElementById('addHistoryBtn');
+        const addHistoryBtnText = document.getElementById('addHistoryBtnText');
+        const addHistorySpinner = document.getElementById('addHistorySpinner');
+
+        // Get references to chart image elements and their placeholders
+        const salesHistoryChartImg = document.getElementById('salesHistoryChartImg');
+        const salesHistoryChartPlaceholder = document.getElementById('salesHistoryChartPlaceholder');
+        const priceHistoryChartImg = document.getElementById('priceHistoryChartImg');
+        const priceHistoryChartPlaceholder = document.getElementById('priceHistoryChartPlaceholder');
+        const inventoryHistoryChartImg = document.getElementById('inventoryHistoryChartImg');
+        const inventoryHistoryChartPlaceholder = document.getElementById('inventoryHistoryChartPlaceholder');
+
+
+        // Function to display ephemeral alert messages
+        function displayAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alert-container');
+            const alertDiv = document.createElement('div');
+            let bgColor = 'bg-blue-500';
+            if (type === 'success') bgColor = 'bg-green-500';
+            if (type === 'error') bgColor = 'bg-red-500';
+            if (type === 'warning') bgColor = 'bg-yellow-500';
+
+            alertDiv.className = `fixed top-4 left-1/2 -translate-x-1/2 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in-down`;
+            alertDiv.textContent = message;
+            alertContainer.appendChild(alertDiv);
+
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 3000);
+        }
+
+        // Function to add/update historical record via API
+        async function addHistoricalRecord() {
+            const recordDate = recordDateInput.value;
+            const salesUnits = salesUnitsInput.value;
+
+            if (!recordDate || salesUnits === '' || isNaN(salesUnits) || parseInt(salesUnits) < 0) {
+                displayAlert('Please enter a valid date and non-negative sales units.', 'warning');
+                return;
+            }
+
+            // Disable button and show spinner
+            addHistoryBtn.disabled = true;
+            addHistoryBtnText.textContent = 'Saving...';
+            addHistorySpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/add_historical_record/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        product_id: product.id,
+                        date: recordDate,
+                        sales_units: parseInt(salesUnits)
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.status === 'success') {
+                    displayAlert(result.message, 'success');
+                    // After successful update, refresh the charts by updating their image sources
+                    refreshCharts();
+                } else {
+                    displayAlert(`Error: ${result.message || 'Unknown error'}`, 'error');
+                    console.error('API error:', result.message);
+                }
+            } catch (error) {
+                console.error('Network error adding historical record:', error);
+                displayAlert('Failed to add historical record due to network error.', 'error');
+            } finally {
+                // Re-enable button and hide spinner
+                addHistoryBtn.disabled = false;
+                addHistoryBtnText.textContent = 'Add/Update Record';
+                addHistorySpinner.classList.add('hidden');
+            }
+        }
+
+        // Function to refresh chart images by updating their src attributes
+        function refreshCharts() {
+            // Add a timestamp to the URL to bust browser cache and force reload of the image
+            const timestamp = new Date().getTime();
+
+            // Sales History Chart
+            salesHistoryChartImg.src = `/api/chart/${product.id}/sales/?_=${timestamp}`;
+            salesHistoryChartImg.onload = () => {
+                salesHistoryChartImg.classList.remove('hidden');
+                salesHistoryChartPlaceholder.classList.add('hidden');
+            };
+            salesHistoryChartImg.onerror = () => {
+                salesHistoryChartImg.classList.add('hidden');
+                salesHistoryChartPlaceholder.classList.remove('hidden');
+            };
+
+            // Price History Chart
+            priceHistoryChartImg.src = `/api/chart/${product.id}/price/?_=${timestamp}`;
+            priceHistoryChartImg.onload = () => {
+                priceHistoryChartImg.classList.remove('hidden');
+                priceHistoryChartPlaceholder.classList.add('hidden');
+            };
+            priceHistoryChartImg.onerror = () => {
+                priceHistoryChartImg.classList.add('hidden');
+                priceHistoryChartPlaceholder.classList.remove('hidden');
+            };
+
+            // Inventory History Chart
+            inventoryHistoryChartImg.src = `/api/chart/${product.id}/inventory/?_=${timestamp}`;
+            inventoryHistoryChartImg.onload = () => {
+                inventoryHistoryChartImg.classList.remove('hidden');
+                inventoryHistoryChartPlaceholder.classList.add('hidden');
+            };
+            inventoryHistoryChartImg.onerror = () => {
+                inventoryHistoryChartImg.classList.add('hidden');
+                inventoryHistoryChartPlaceholder.classList.remove('hidden');
+            };
+        }
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set default date to today for convenience
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            recordDateInput.value = `${year}-${month}-${day}`;
+
+            // Attach event listener to the Add History button
+            if (addHistoryBtn) {
+                addHistoryBtn.addEventListener('click', addHistoricalRecord);
+            }
+
+            // Initial chart load
+            refreshCharts();
+        });
+
+        // Helper function to get CSRF token (needed for POST requests in Django)
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-commerce Optimization Dashboard</title>
+    <!-- Tailwind CSS CDN - for quick setup -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the app */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Animation for alerts */
+        .animate-fade-in-down {
+            animation: fadeInDown 0.5s ease-out forwards;
+        }
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) translateX(-50%);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) translateX(-50%);
+            }
+        }
+        /* Ensure canvas elements fill their parent container's size */
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        /* Simple spinner animation */
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            -webkit-animation: spin 1s ease-in-out infinite;
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { -webkit-transform: rotate(360deg); }
+        }
+        @-webkit-keyframes spin {
+            to { -webkit-transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-100 font-sans text-gray-800 p-4 sm:p-6 lg:p-8">
+    <!-- Global Alert Message Container -->
+    <div id="alert-container"></div>
+
+    <!-- Header Section -->
+    <header class="bg-white rounded-xl shadow-md p-4 mb-8">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-2">
+            <h1 class="text-3xl sm:text-4xl font-bold text-indigo-700 mb-2 sm:mb-0">
+                E-commerce Optimization Dashboard
+            </h1>
+            <div class="flex items-center space-x-4">
+                {% if user.is_authenticated %}
+                    <span class="text-gray-700 text-lg font-medium">Hello, {{ user.username }}!</span>
+                    <a href="{% url 'logout' %}"
+                       class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                        Logout
+                    </a>
+                {% else %}
+                    <a href="{% url 'login' %}"
+                       class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                        Login
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        <p class="text-gray-600 mt-2 text-center">
+            Dynamic Pricing & Inventory Management with ML Insights
+        </p>
+    </header>
+
+    <!-- Main Content Grid Layout -->
+    <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Product Dashboard Section -->
+        <section class="lg:col-span-2 bg-white rounded-xl shadow-md p-6">
+            <h2 class="text-2xl font-semibold text-indigo-600 mb-4">Product Dashboard</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white rounded-lg overflow-hidden">
+                    <thead class="bg-indigo-50 border-b border-indigo-200">
+                        <tr>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Product</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Category</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Current Price</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Suggested Price</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Inventory</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Demand Forecast (7 Days)</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Sales (Last 7 Days)</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Margin (%)</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Competitor Price</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="product-table-body" class="divide-y divide-gray-200">
+                        {% load custom_filters %} {# Load your custom filters here #}
+                        {% for product in products %}
+                        <tr data-product-id="{{ product.id }}" class="hover:bg-gray-50">
+                            <td class="py-3 px-4 text-sm text-gray-900 font-medium">
+                                <a href="{% url 'product_detail' product.id %}" class="text-indigo-600 hover:underline">
+                                    {{ product.name }}
+                                </a>
+                            </td>
+                            <td class="py-3 px-4 text-sm text-gray-700">{{ product.category }}</td>
+                            <td class="py-3 px-4 text-sm text-gray-700 current-price">${{ product.current_price|floatformat:2 }}</td>
+                            <td class="py-3 px-4 text-sm text-indigo-600 font-semibold suggested-price">${{ product.suggested_price|floatformat:2 }}</td>
+                            <td class="py-3 px-4 text-sm text-gray-700 inventory-level">
+                                <span class="{% if product.is_out_of_stock %}text-red-700 font-bold{% elif product.is_low_stock %}text-red-600 font-bold{% endif %}">
+                                    {{ product.inventory }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-sm text-gray-700">{{ product.demand_forecast }}</td>
+                            <td class="py-3 px-4 text-sm text-gray-700">{{ product.sales_last_7_days }}</td>
+                            <td class="py-3 px-4 text-sm text-gray-700">{{ product.margin|multiply:100|floatformat:1 }}%</td>
+                            <td class="py-3 px-4 text-sm text-gray-700">${{ product.competitor_price|floatformat:2 }}</td>
+                            <td class="py-3 px-4 text-sm">
+                                <button
+                                    onclick="applySuggestedPrice('{{ product.id }}')"
+                                    class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1 px-3 rounded-md text-xs transition duration-300 ease-in-out transform hover:scale-105 shadow-sm"
+                                >
+                                    Apply Price
+                                </button>
+                                <input
+                                    type="number"
+                                    value="{{ product.inventory }}"
+                                    onblur="updateInventory('{{ product.id }}', this.value)"
+                                    class="ml-2 w-20 p-1 border border-gray-300 rounded-md text-sm"
+                                    min="0"
+                                />
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Side Panels -->
+        <div class="lg:col-span-1 grid grid-rows-3 gap-6">
+            <!-- Pricing Strategy Configuration -->
+            <section class="bg-white rounded-xl shadow-md p-6">
+                <h2 class="text-xl font-semibold text-indigo-600 mb-4">Pricing Strategy Configuration</h2>
+                <p class="text-gray-700 mb-3">
+                    Define rules and constraints for your dynamic pricing engine.
+                </p>
+                <div class="space-y-3">
+                    <div>
+                        <label for="minMargin" class="block text-sm font-medium text-gray-700">Minimum Margin (%):</label>
+                        <input
+                            type="number"
+                            id="minMargin"
+                            value="20"
+                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                    </div>
+                    <div>
+                        <label for="compMatch" class="block text-sm font-medium text-gray-700">Competitor Match Threshold (%):</label>
+                        <input
+                            type="number"
+                            id="compMatch"
+                            value="95"
+                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                    </div>
+                    <button class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                        Save Strategy
+                    </button>
+                </div>
+            </section>
+
+            <!-- Inventory Alerts -->
+            <section class="bg-white rounded-xl shadow-md p-6">
+                <h2 class="text-xl font-semibold text-indigo-600 mb-4">Inventory Alerts</h2>
+                <ul id="inventory-alerts-list" class="space-y-2 text-gray-700">
+                    <!-- Alerts will be updated by JavaScript -->
+                </ul>
+                <button class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-md mt-4 transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                    View All Alerts
+                </button>
+            </section>
+
+            <!-- Performance Analytics & Promotion Planning -->
+            <section class="bg-white rounded-xl shadow-md p-6">
+                <h2 class="text-xl font-semibold text-indigo-600 mb-4">Performance Analytics & Promotion Planning</h2>
+                <p class="text-gray-700 mb-3">
+                    Gain insights into revenue, profit, and plan future promotions.
+                </p>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center bg-gray-50 p-3 rounded-md">
+                        <span class="font-medium text-gray-700">Total Revenue (Simulated):</span>
+                        <span id="total-revenue" class="font-bold text-green-700">$0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-gray-50 p-3 rounded-md">
+                        <span class="font-medium text-gray-700">Avg. Margin (%):</span>
+                        <span id="avg-margin" class="font-bold text-green-700">0.0%</span>
+                    </div>
+                    <button id="runMlPredictionsBtn" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                        <span id="mlButtonText">Run ML Predictions</span>
+                        <span id="mlSpinner" class="spinner hidden"></span>
+                    </button>
+                    <div id="mlOutput" class="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded-md hidden overflow-auto max-h-24"></div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Charting Section -->
+    <section class="bg-white rounded-xl shadow-md p-6 mt-6">
+        <h2 class="text-2xl font-semibold text-indigo-600 mb-4">Product Performance Charts</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="h-80"> {# Added fixed height for the chart container #}
+                <h3 class="text-xl font-medium text-gray-700 mb-2">Sales Trend (Last 7 Days)</h3>
+                <canvas id="salesTrendChart"></canvas>
+            </div>
+            <div class="h-80"> {# Added fixed height for the chart container #}
+                <h3 class="text-xl font-medium text-gray-700 mb-2">Inventory vs. Demand</h3>
+                <canvas id="inventoryDemandChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Data populated by Django template initially, then managed by JS
+        let productsData = [
+            {% for product in products %}
+            {
+                id: '{{ product.id }}',
+                name: '{{ product.name }}',
+                category: '{{ product.category }}',
+                currentPrice: {{ product.current_price }},
+                suggestedPrice: {{ product.suggested_price }},
+                inventory: {{ product.inventory }},
+                demandForecast: {{ product.demand_forecast }},
+                salesLast7Days: {{ product.sales_last_7_days }},
+                margin: {{ product.margin }},
+                competitorPrice: {{ product.competitor_price }},
+                lastUpdated: '{{ product.last_updated }}',
+                historicalSalesData: {{ product.historical_sales_data|safe }},
+            },
+            {% endfor %}
+        ];
+
+        // Chart instances
+        let salesTrendChartInstance = null;
+        let inventoryDemandChartInstance = null;
+
+        // Get references to ML button elements
+        const mlButton = document.getElementById('runMlPredictionsBtn');
+        const mlButtonText = document.getElementById('mlButtonText');
+        const mlSpinner = document.getElementById('mlSpinner');
+        const mlOutputDiv = document.getElementById('mlOutput');
+
+
+        // Function to display ephemeral alert messages
+        function displayAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alert-container');
+            const alertDiv = document.createElement('div');
+            let bgColor = 'bg-blue-500';
+            if (type === 'success') bgColor = 'bg-green-500';
+            if (type === 'error') bgColor = 'bg-red-500';
+            if (type === 'warning') bgColor = 'bg-yellow-500';
+
+            alertDiv.className = `fixed top-4 left-1/2 -translate-x-1/2 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in-down`;
+            alertDiv.textContent = message;
+            alertContainer.appendChild(alertDiv);
+
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 3000);
+        }
+
+        // Function to send product updates to the Django backend API
+        async function updateProductInDB(productId, field, value) {
+            try {
+                const response = await fetch('/api/update_product/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ id: productId, [field]: value })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.status === 'success') {
+                    displayAlert(result.message, 'success');
+                    productsData = productsData.map(p =>
+                        p.id === productId ? { ...p, [field]: value, lastUpdated: result.product.lastUpdated } : p
+                    );
+                    renderProductTable();
+                    updateAnalytics();
+                    checkInventoryAlerts();
+                    renderCharts();
+                } else {
+                    displayAlert(`Error: ${result.message || 'Unknown error during update.'}`, 'error');
+                    console.error('Backend error:', result.message);
+                }
+            } catch (error) {
+                console.error('Network or fetch error:', error);
+                displayAlert('Failed to update product due to network error.', 'error');
+            }
+        }
+
+        // Handler for "Apply Price" button click
+        function applySuggestedPrice(productId) {
+            const product = productsData.find(p => p.id === productId);
+            if (product) {
+                updateProductInDB(productId, 'currentPrice', product.suggestedPrice);
+            }
+        }
+
+        // Handler for inventory input field blur (when user finishes typing)
+        function updateInventory(productId, newQuantityStr) {
+            const newQuantity = parseInt(newQuantityStr, 10);
+            if (!isNaN(newQuantity) && newQuantity >= 0) {
+                updateProductInDB(productId, 'inventory', newQuantity);
+            } else {
+                displayAlert('Invalid inventory quantity. Please enter a non-negative number.', 'warning');
+            }
+        }
+
+        // Function to dynamically render the product table rows based on productsData
+        function renderProductTable() {
+            const tableBody = document.getElementById('product-table-body');
+            tableBody.innerHTML = '';
+
+            productsData.forEach(product => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-product-id', product.id);
+                row.className = 'hover:bg-gray-50';
+
+                let inventoryClass = '';
+                if (product.inventory === 0) {
+                    inventoryClass = 'text-red-700 font-bold';
+                } else if (product.inventory < product.demandForecast * 0.5) {
+                    inventoryClass = 'text-red-600 font-bold';
+                }
+
+                row.innerHTML = `
+                    <td class="py-3 px-4 text-sm text-gray-900 font-medium">
+                        <a href="/product/${product.id}/" class="text-indigo-600 hover:underline">
+                            ${product.name}
+                        </a>
+                    </td>
+                    <td class="py-3 px-4 text-sm text-gray-700">${product.category}</td>
+                    <td class="py-3 px-4 text-sm text-gray-700 current-price">$${product.currentPrice.toFixed(2)}</td>
+                    <td class="py-3 px-4 text-sm text-indigo-600 font-semibold suggested-price">$${product.suggestedPrice.toFixed(2)}</td>
+                    <td class="py-3 px-4 text-sm text-gray-700 inventory-level">
+                        <span class="${inventoryClass}">
+                            ${product.inventory}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-sm text-gray-700">${product.demandForecast}</td>
+                    <td class="py-3 px-4 text-sm text-gray-700">${product.salesLast7Days}</td>
+                    <td class="py-3 px-4 text-sm text-gray-700">${(product.margin * 100).toFixed(1)}%</td>
+                    <td class="py-3 px-4 text-sm text-gray-700">$${product.competitorPrice.toFixed(2)}</td>
+                    <td class="py-3 px-4 text-sm">
+                        <button
+                            onclick="applySuggestedPrice('${product.id}')"
+                            class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1 px-3 rounded-md text-xs transition duration-300 ease-in-out transform hover:scale-105 shadow-sm"
+                        >
+                            Apply Price
+                        </button>
+                        <input
+                            type="number"
+                            value="${product.inventory}"
+                            onblur="updateInventory('${product.id}', this.value)"
+                            class="ml-2 w-20 p-1 border border-gray-300 rounded-md text-sm"
+                            min="0"
+                        />
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Function to update the performance analytics section
+        function updateAnalytics() {
+            const totalRevenue = productsData.reduce((acc, p) => acc + (p.salesLast7Days * p.currentPrice), 0);
+            const avgMargin = productsData.reduce((acc, p) => acc + p.margin, 0) / productsData.length * 100;
+
+            document.getElementById('total-revenue').textContent = `$${totalRevenue.toFixed(2)}`;
+            document.getElementById('avg-margin').textContent = `${avgMargin.toFixed(1)}%`;
+        }
+
+        // Function to check inventory levels and update the alerts list
+        function checkInventoryAlerts() {
+            const alertsList = document.getElementById('inventory-alerts-list');
+            alertsList.innerHTML = '';
+
+            const lowStockProducts = productsData.filter(p => p.inventory < p.demandForecast * 0.5 && p.inventory > 0);
+            const outOfStockProducts = productsData.filter(p => p.inventory === 0);
+
+            if (lowStockProducts.length > 0 || outOfStockProducts.length > 0) {
+                lowStockProducts.forEach(product => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'flex items-center text-red-600 font-medium';
+                    listItem.innerHTML = `
+                        <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.542 2.705-1.542 3.47 0l3.55 7.101a1.5 1.5 0 01-1.302 2.29H5.99c-.994 0-1.66-1.07-1.302-2.29l3.55-7.101zM11 15a1 1 0 10-2 0 1 1 0 002 0zm-1 3a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                        </svg>
+                        Low stock: ${product.name} (${product.inventory} left)
+                    `;
+                    alertsList.appendChild(listItem);
+                });
+
+                outOfStockProducts.forEach(product => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'flex items-center text-red-700 font-bold';
+                    listItem.innerHTML = `
+                        <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        OUT OF STOCK: ${product.name}
+                    `;
+                    alertsList.appendChild(listItem);
+                });
+            } else {
+                const listItem = document.createElement('li');
+                listItem.className = 'text-green-600 font-medium';
+                listItem.innerHTML = `
+                    <svg class="h-5 w-5 mr-2 inline-block" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    All inventory levels are healthy!
+                `;
+                alertsList.appendChild(listItem);
+            }
+        }
+
+        // --- Chart Functions ---
+        function renderCharts() {
+            if (salesTrendChartInstance) {
+                salesTrendChartInstance.destroy();
+            }
+            if (inventoryDemandChartInstance) {
+                inventoryDemandChartInstance.destroy();
+            }
+
+            const salesLabels = [];
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                salesLabels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            }
+
+            const salesDatasets = productsData.map(product => ({
+                label: product.name,
+                data: product.historicalSalesData,
+                borderColor: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                fill: false,
+                tension: 0.1
+            }));
+
+            const salesCtx = document.getElementById('salesTrendChart').getContext('2d');
+            salesTrendChartInstance = new Chart(salesCtx, {
+                type: 'line',
+                data: {
+                    labels: salesLabels,
+                    datasets: salesDatasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Product Sales Trend (Last 7 Days)',
+                            font: { size: 16 }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Units Sold'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        }
+                    }
+                }
+            });
+
+            const inventoryLabels = productsData.map(product => product.name);
+            const inventoryData = productsData.map(product => product.inventory);
+            const demandData = productsData.map(product => product.demandForecast);
+
+            const inventoryCtx = document.getElementById('inventoryDemandChart').getContext('2d');
+            inventoryDemandChartInstance = new Chart(inventoryCtx, {
+                type: 'bar',
+                data: {
+                    labels: inventoryLabels,
+                    datasets: [
+                        {
+                            label: 'Current Inventory',
+                            data: inventoryData,
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Demand Forecast (7 Days)',
+                            data: demandData,
+                            backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                            borderColor: 'rgba(255, 159, 64, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Inventory vs. Demand Forecast',
+                            font: { size: 16 }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Units'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Product'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Function to trigger ML predictions via API
+        async function runMlPredictions() {
+            // Disable button and show spinner
+            mlButton.disabled = true;
+            mlButtonText.textContent = 'Running...';
+            mlSpinner.classList.remove('hidden');
+            mlOutputDiv.classList.add('hidden'); // Hide previous output
+            mlOutputDiv.textContent = ''; // Clear previous output
+
+            displayAlert('Running ML predictions... Please wait.', 'info');
+            try {
+                const response = await fetch('/api/run_ml_predictions/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({})
+                });
+
+                const result = await response.json();
+                if (response.ok && result.status === 'success') {
+                    displayAlert('ML predictions completed!', 'success');
+                    mlOutputDiv.textContent = result.output; // Display raw output
+                    mlOutputDiv.classList.remove('hidden');
+                    // After predictions run, re-fetch all data to update the dashboard
+                    window.location.reload();
+                } else {
+                    displayAlert(`Error running ML predictions: ${result.message || 'Unknown error'}`, 'error');
+                    mlOutputDiv.textContent = `Error: ${result.message || 'Unknown'}\n${result.output || ''}`;
+                    mlOutputDiv.classList.remove('hidden');
+                    console.error('ML trigger error:', result.output || result.message);
+                }
+            } catch (error) {
+                console.error('Network error triggering ML:', error);
+                displayAlert('Failed to trigger ML predictions due to network error.', 'error');
+                mlOutputDiv.textContent = `Network error: ${error.message}`;
+                mlOutputDiv.classList.remove('hidden');
+            } finally {
+                // Re-enable button and hide spinner
+                mlButton.disabled = false;
+                mlButtonText.textContent = 'Run ML Predictions';
+                mlSpinner.classList.add('hidden');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderProductTable();
+            updateAnalytics();
+            checkInventoryAlerts();
+            renderCharts();
+
+            // Attach event listener to the ML button
+            if (mlButton) {
+                mlButton.addEventListener('click', runMlPredictions);
+            }
+        });
+
+        // Helper function to get CSRF token (needed for POST requests in Django)
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>

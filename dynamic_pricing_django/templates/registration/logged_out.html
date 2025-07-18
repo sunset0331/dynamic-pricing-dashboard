@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logged Out - E-commerce Optimization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-md text-center">
+        <h2 class="text-3xl font-bold text-indigo-700 mb-4">Logged Out</h2>
+        <p class="text-gray-700 mb-6">You have been successfully logged out.</p>
+        <a href="{% url 'login' %}"
+           class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+            Log In Again
+        </a>
+    </div>
+</body>
+</html>

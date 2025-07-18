@@ -1,0 +1,60 @@
+    # Byte-compiled / optimized / DLL files
+    __pycache__/
+    *.pyc
+    *.pyd
+    *.pyo
+    *.sqlite3  # Your SQLite database file
+    db.sqlite3 # Specific name for default Django DB
+
+    # C extensions
+    *.so
+
+    # Distribution / packaging
+    .Python
+    build/
+    develop-eggs/
+    dist/
+    eggs/
+    .eggs/
+    lib/
+    lib64/
+    parts/
+    sdist/
+    var/
+    wheels/
+    *.egg-info/
+    .installed.cfg
+    *.egg
+
+    # Environments
+    .env
+    .venv
+    env/
+    venv/  # Your virtual environment folder
+    ENV/
+    env.bak/
+    venv.bak/
+
+    # Editors
+    .DS_Store
+    *.sublime-project
+    *.sublime-workspace
+    .vscode/ # VS Code specific settings (optional, but often good to ignore)
+
+    # Django stuff:
+    *.log
+    local_settings.py # If you create a local settings file
+    media/           # User-uploaded media files (if you configure this)
+    static_root/     # Collected static files (if you run collectstatic)
+
+    # ML model files
+    *.joblib # Your trained ML models
+    *.pkl
+    *.h5
+
+    # Matplotlib cache
+    .matplotlib/
+
+    # IDE specific files
+    .idea/ # PyCharm
+    
